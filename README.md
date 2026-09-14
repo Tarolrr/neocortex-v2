@@ -32,38 +32,33 @@ Python ABI: иначе lock для другой платформы был бы �
 
 ## Что наблюдал этот воркер
 
-Read-only наблюдение на момент подготовки: Linux aarch64, Python 3.13.5, Git
-2.47.3; `pytest` и `ruff` отсутствовали в `PATH`. Это **не** доказательство
-состава целевой Orange Pi и не характеристика среды арбитра. Никакие пакеты,
-сервисы, credentials или модель при подготовке не устанавливались и не
-вызывались.
+Offline-среда готова по результатам владельца и проверок воркера: Linux aarch64,
+Python 3.13.5, Git 2.47.3, pytest 8.3.5 и Ruff 0.9.10. Воспроизводимое
+свидетельство, включая команды, результаты и ссылку на ответ владельца, находится
+в [docs/offline-environment-readiness.md](docs/offline-environment-readiness.md).
+Никакие пакеты, сервисы, credentials или модель при подготовке не устанавливались
+и не вызывались.
 
 ## Установка выполняется владельцем
 
-Все команды ниже запускаются из корня worktree. Имя `.venv-bootstrap` намеренно
-отделяет эксперимент от host и будущего рабочего окружения.
+Владелец подготовил один стабильный checkout `/opt/neocortex-v2-runner` и его
+venv `/opt/neocortex-v2-runner/.venv`; `.venv-bootstrap` внутри worktree не
+используется. Воркеры и арбитр запускают команды из корня своего назначенного
+worktree, явно добавляя этот venv в `PATH`. Это не требует и не разрешает
+воркеру изменять `/opt/neocortex-v2-runner`.
 
 ```console
-$ python3.13 -m venv .venv-bootstrap
-$ .venv-bootstrap/bin/python -m pip install -r requirements-dev.txt -c constraints.txt
-$ .venv-bootstrap/bin/python -m pytest -q
-$ .venv-bootstrap/bin/ruff check .
-$ .venv-bootstrap/bin/python scripts/check_environment.py
-```
-
-Для арбитра передайте тот же путь, не полагаясь на shell activation:
-
-```console
-$ export PATH="$PWD/.venv-bootstrap/bin:$PATH"
-$ python -m pytest -q
+$ export PATH=/opt/neocortex-v2-runner/.venv/bin:$PATH
+$ python3 scripts/check_environment.py
+$ pytest -q
 $ ruff check .
 ```
 
-Если эксперимент нужно удалить, допустима только явная цель из примера ниже;
-не удаляйте host Python или общий каталог окружений.
+`test_cmd` проекта для арбитра содержит тот же override, поэтому его shell не
+обязан наследовать интерактивный `PATH` владельца:
 
 ```console
-$ rm -rf .venv-bootstrap
+$ export PATH=/opt/neocortex-v2-runner/.venv/bin:$PATH; python -m pytest -q && ruff check .
 ```
 
 На данном первом этапе stdlib bootstrap-проверки — временный контракт, который
@@ -108,10 +103,10 @@ Native structured output — отдельная compatibility-проверка. 
 
 ### Checklist владельца перед следующей задачей
 
-- [ ] Назвать целевой host, Orange Pi модель, OS, CPU-архитектуру и libc.
-- [ ] Утвердить абсолютные пути к venv, worktree и Python 3.13.x.
-- [ ] Подтвердить доступность этого Python, Git, pytest и Ruff и воркеру, и
-  арбитру; передать им одинаковый `PATH`/окружение.
+- [x] Назвать целевой host, Orange Pi модель, OS, CPU-архитектуру и libc.
+- [x] Утвердить абсолютные пути к venv, worktree и Python 3.13.x.
+- [x] Подтвердить доступность этого Python, Git, pytest и Ruff воркеру и
+  арбитру через явный `PATH` в `test_cmd`.
 - [ ] Выбрать и проверить конкретные OpenCode release, binary/container и
   checksum для целевой архитектуры.
 - [ ] Создать отдельные OpenCode data/config/history каталоги и отдельный
