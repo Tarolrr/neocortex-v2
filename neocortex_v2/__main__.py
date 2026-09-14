@@ -11,7 +11,7 @@ from .config import CoordinatorConfig, validate_config
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Offline checks for the neocortex-v2 coordinator.")
-    commands = parser.add_subparsers(dest="command")
+    commands = parser.add_subparsers(dest="command", required=True)
     check = commands.add_parser("config-check", help="validate local configuration without network calls")
     check.add_argument("--namespace", required=True, help="OpenCode namespace or store identity")
     check.add_argument("--base-url", required=True, help="OpenCode base URL")
@@ -25,9 +25,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     arguments = parser.parse_args(argv)
-    if arguments.command != "config-check":
-        parser.print_help()
-        return 0
     config = CoordinatorConfig(
         namespace=arguments.namespace,
         base_url=arguments.base_url,

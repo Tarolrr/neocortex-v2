@@ -38,6 +38,12 @@ def test_config_check_rejects_incomplete_configuration_without_secret_echo() -> 
     assert secret not in result.stdout + result.stderr
 
 
+def test_missing_command_is_a_clear_nonzero_error() -> None:
+    result = run_cli()
+    assert result.returncode != 0
+    assert "command" in result.stderr
+
+
 def test_help_and_config_check_do_not_import_network_client(monkeypatch, tmp_path: Path) -> None:
     from neocortex_v2.__main__ import main
 
