@@ -39,6 +39,17 @@ Python 3.13.5, Git 2.47.3, pytest 8.3.5 и Ruff 0.9.10. Воспроизводи
 Никакие пакеты, сервисы, credentials или модель при подготовке не устанавливались
 и не вызывались.
 
+## Offline CLI и следующая проверка API
+
+CLI выполняет только локальную валидацию: не импортирует SDK, не создаёт сеть и не вызывает модель. Для `config-check` обязательны namespace, base URL, существующие workdir/state directory и явные provider/model:
+
+```console
+$ python3 -m neocortex_v2 --help
+$ python3 -m neocortex_v2 config-check --namespace isolated-smoke --base-url http://127.0.0.1:4096 --workdir /existing/scratch-git --state-dir /existing/state --provider PROVIDER --model MODEL
+```
+
+Ошибки имеют ненулевой код и не печатают значения параметров, поэтому случайный секрет не раскрывается. Exact SDK investigation выявил gap: `opencode-ai` `0.1.0-alpha.36` имеет `session.create`/`session.chat`, но не `session.prompt`, schema-format или `structured_output`. См. [compatibility report](docs/sdk-compatibility-report.md). Это не разрешает text/file fallback. Требования отдельного следующего smoke — в [planning handoff](docs/next-smoke-handoff.md); successful live smoke остаётся gate до implementation lifecycle.
+
 ## Установка выполняется владельцем
 
 Владелец подготовил один стабильный checkout `/opt/neocortex-v2-runner` и его
