@@ -1,0 +1,18 @@
+[project]
+name = "neocortex-v2"
+version = "0.0.0"
+description = "Bootstrap contract for the Python coordinator"
+requires-python = ">=3.13,<3.14"
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.3.5",
+  "ruff==0.9.10",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
