@@ -1,0 +1,5 @@
+# Approved direct tool versions for the Python 3.13 coordinator bootstrap.
+# Transitive packages are resolved by pip for the target platform; capture a
+# platform-specific hash lock only after the owner selects the Orange Pi image.
+pytest==8.3.5
+ruff==0.9.10
