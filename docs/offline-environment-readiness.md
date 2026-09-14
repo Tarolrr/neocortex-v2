@@ -13,8 +13,11 @@
 `constraints.txt`, доступность канонического Python/Git, путь venv и
 подтверждение `test_cmd`; секреты, токены и значения credentials не
 запрашивались. Ответ владельца, который устранил blocker и разъяснил механику
-арбитра, сохранён в scheduler transcript:
-`/root/.neocortex/runs/worker-neocortex-v2-T006_20260914T215250Z/session.log`.
+арбитра, сохранён в разделе `New messages for you` scheduler brief:
+`/root/.neocortex/runs/worker-neocortex-v2-T006_20260914T215250Z/brief.md`.
+Исход штатного ASK (включая точные запрошенные команды и единый перечень
+подтверждений) сохранён отдельно:
+`/root/.neocortex/runs/worker-neocortex-v2-T006_20260914T165550Z/outcome.json`.
 
 Подтверждённые несекретные факты:
 
