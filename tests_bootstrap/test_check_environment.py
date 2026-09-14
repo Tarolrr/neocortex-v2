@@ -1,10 +1,11 @@
 import io
+import os
 import subprocess
 import sys
 import unittest
 from unittest.mock import patch
 
-from scripts.check_environment import Probe, python_module_probe, run_check
+from scripts.check_environment import CANONICAL_PYTHON, Probe, main, python_module_probe, run_check
 
 
 class CheckEnvironmentTests(unittest.TestCase):
@@ -28,6 +29,29 @@ class CheckEnvironmentTests(unittest.TestCase):
         code = run_check({"python": Probe("available", "python: 3.13.5")}, report)
         self.assertEqual(code, 0)
         self.assertIn("AVAILABLE:\n  - python: 3.13.5", report.getvalue())
+
+    @patch("scripts.check_environment.run_check", return_value=0)
+    @patch("scripts.check_environment.os.access", return_value=False)
+    @patch("scripts.check_environment.os.path.isfile", return_value=False)
+    def test_missing_canonical_python_falls_back_with_report(self, isfile, access, run):
+        self.assertEqual(main([]), 0)
+        selection = run.call_args.kwargs["selection"]
+        self.assertEqual(selection.state, "available")
+        self.assertIn(CANONICAL_PYTHON, selection.detail)
+        self.assertIn(sys.executable, selection.detail)
+
+    @patch("scripts.check_environment.os.access", return_value=True)
+    @patch("scripts.check_environment.os.path.isfile", return_value=True)
+    def test_existing_selected_python_reexecs(self, isfile, access):
+        selected = "/tmp/project-python"
+        with (
+            patch("scripts.check_environment.os.execv", side_effect=SystemExit) as reexec,
+            self.assertRaises(SystemExit),
+        ):
+            main(["--python", selected])
+        reexec.assert_called_once_with(
+            selected, [selected, os.path.abspath("scripts/check_environment.py"), "--python", selected]
+        )
 
     @patch("scripts.check_environment.shutil.which")
     @patch("scripts.check_environment.subprocess.run")

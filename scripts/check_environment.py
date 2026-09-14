@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 import re
 import shutil
 import subprocess
@@ -16,6 +17,7 @@ PYTHON_VERSION = (3, 13)
 GIT_MINIMUM = (2, 40)
 TOOLS = {"pytest": "8.3.5", "ruff": "0.9.10"}
 IMPORTS = {"pytest": "pytest", "ruff": "ruff"}
+CANONICAL_PYTHON = "/opt/neocortex-v2-runner/.venv/bin/python"
 
 
 @dataclass(frozen=True)
@@ -89,10 +91,14 @@ def import_probe(module: str) -> Probe:
     return Probe("available", f"import {module}: available")
 
 
-def collect(probes: Mapping[str, Probe] | None = None) -> dict[str, Probe]:
+def collect(
+    probes: Mapping[str, Probe] | None = None, selection: Probe | None = None
+) -> dict[str, Probe]:
     if probes is not None:
         return dict(probes)
     result = {"python": python_probe(), "git": command_probe("git", GIT_MINIMUM)}
+    if selection is not None:
+        result["interpreter-selection"] = selection
     for tool, version in TOOLS.items():
         result[tool] = python_module_probe(tool, version)
     for tool, module in IMPORTS.items():
@@ -100,10 +106,14 @@ def collect(probes: Mapping[str, Probe] | None = None) -> dict[str, Probe]:
     return result
 
 
-def run_check(probes: Mapping[str, Probe] | None = None, stream: TextIO | None = None) -> int:
+def run_check(
+    probes: Mapping[str, Probe] | None = None,
+    stream: TextIO | None = None,
+    selection: Probe | None = None,
+) -> int:
     stream = stream or sys.stdout
     grouped = {state: [] for state in ("missing", "incompatible", "available")}
-    for probe in collect(probes).values():
+    for probe in collect(probes, selection).values():
         grouped.setdefault(probe.state, []).append(probe.detail)
     for state in ("missing", "incompatible", "available"):
         print(f"{state.upper()}:", file=stream)
@@ -114,8 +124,30 @@ def run_check(probes: Mapping[str, Probe] | None = None, stream: TextIO | None =
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args(argv)
-    return run_check()
+    parser.add_argument(
+        "--python",
+        default=CANONICAL_PYTHON,
+        help=(
+            "interpreter to inspect (default: %(default)s); if it exists, "
+            "the script re-execs itself with it"
+        ),
+    )
+    args = parser.parse_args(argv)
+    selected = os.path.abspath(args.python)
+    if os.path.isfile(selected) and os.access(selected, os.X_OK):
+        # A venv's ``python`` is often a symlink to the host binary, so
+        # samefile() would incorrectly say that a host invocation is already
+        # inside the venv.  sys.executable preserves the invocation path.
+        same_interpreter = os.path.abspath(sys.executable) == selected
+        if not same_interpreter:
+            os.execv(selected, [selected, os.path.abspath(__file__), "--python", selected])
+        selection = Probe("available", f"interpreter selection: {selected}")
+    else:
+        selection = Probe(
+            "available",
+            f"interpreter selection: {selected} is unavailable; using {sys.executable}",
+        )
+    return run_check(selection=selection)
 
 
 if __name__ == "__main__":
