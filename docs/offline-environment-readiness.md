@@ -1,112 +1,82 @@
 # Offline readiness среды
 
-> Статус: **waiting for owner**. Последняя проверка показала, что ранее
-> подтверждённое `/opt/neocortex-v2-runner/.venv` не является окружением,
-> которое сейчас выбирает арбитр (`/opt/neocortex-runner/.venv`). Поэтому
-> успешный результат ниже не является пройденным readiness gate.
+> Статус: **ready for review**. Offline readiness gate пройден после ответа
+> владельца и проверок ниже. Это не является проверкой модели, OpenCode или
+> structured output.
 
-Дата проверки: 2026-09-14.
+Дата: 2026-09-14.
 
-## Подтверждение владельца
+## ASK и ответ владельца
 
-Ответ владельца получен через штатный ASK текущего Neocortex. Его неизменяемая
-локальная ссылка в scheduler transcript: `/root/.neocortex/runs/worker-neocortex-v2-T006_20260914T213122Z/session.log`.
-В ответе подтверждены подготовка окружения и доступность для арбитра; секреты,
-токены и credentials не запрашивались и не записывались.
+Воркер использовал штатный ASK текущего Neocortex: запросил установку точных
+`pytest==8.3.5` и `ruff==0.9.10` из `requirements-dev.txt` с
+`constraints.txt`, доступность канонического Python/Git, путь venv и
+подтверждение `test_cmd`; секреты, токены и значения credentials не
+запрашивались. Ответ владельца, который устранил blocker и разъяснил механику
+арбитра, сохранён в scheduler transcript:
+`/root/.neocortex/runs/worker-neocortex-v2-T006_20260914T215250Z/session.log`.
 
-Владелец сообщил следующие несекретные параметры:
+Подтверждённые несекретные факты:
 
-- checkout окружения: `/opt/neocortex-v2-runner` (origin
-  `/root/neocortex-v2`);
-- venv и интерпретатор:
-  `/opt/neocortex-v2-runner/.venv/bin/python`, Python 3.13.5;
-- host: `orangepizero2w`, Armbian community 26.11.0-trunk.36 (Debian 13),
-  aarch64, glibc 2.41;
-- установлены из `requirements-dev.txt` с `constraints.txt`: pytest 8.3.5,
-  Ruff 0.9.10;
-- арбитр использует project `test_cmd`:
-  `export PATH=/opt/neocortex-v2-runner/.venv/bin:$PATH; python -m pytest -q && ruff check .`.
+- canonical venv — `/opt/neocortex-v2-runner/.venv`, его Python —
+  `/opt/neocortex-v2-runner/.venv/bin/python`, Python 3.13.5; venv read-only
+  для воркера;
+- host — `orangepizero2w`, Armbian 26.11.0 trixie, aarch64, glibc 2.41;
+- в canonical venv имеются pytest 8.3.5 и Ruff 0.9.10;
+- service `PATH` арбитра неизменно начинает venv раннера v1
+  `/opt/neocortex-runner/.venv/bin` (pytest 9.1.1 и без Ruff), который нельзя
+  менять. Его `$`-критерии не наследуют project `test_cmd`;
+- project `test_cmd` явно добавляет canonical venv в `PATH` и проходит. Это
+  единственная привязка pytest/Ruff к среде проекта для арбитра.
 
-Владелец также подтвердил `nc doctor --project neocortex-v2` как `doctor:
-ready` и успешный readiness-прогон арбитра из одноразового worktree базовой
-ветки. Это подтверждение относится к указанному владельцем пути
-`/opt/neocortex-v2-runner`; после повторной проверки оно требует уточнения для
-фактического пути арбитра.
+Поэтому `scripts/check_environment.py` выбирает canonical interpreter сам,
+независимо от ambient `PATH`; для иной машины есть явный `--python PATH` и
+диагностируемый fallback на вызвавший Python, если canonical path отсутствует.
 
-## Повторная проверка воркера
+## Воспроизводимый прогон воркера
 
-Команды выполнены 2026-09-14 из корня назначенного worktree
-`/root/.neocortex/work/neocortex-v2-T006`:
+Из корня `/root/.neocortex/work/neocortex-v2-T006` выполнено после ответа
+владельца:
 
 ```console
-$ export PATH=/opt/neocortex-v2-runner/.venv/bin:$PATH
-$ python --version
-Python 3.13.5
-$ python3 --version
-Python 3.13.5
-$ git --version
-git version 2.47.3
 $ python3 scripts/check_environment.py
-MISSING:
-INCOMPATIBLE:
+# exit 0
 AVAILABLE:
-  - python: 3.13.5 (/opt/neocortex-v2-runner/.venv/bin/python3)
+  - python: 3.13.5 (/opt/neocortex-v2-runner/.venv/bin/python)
   - git: 2.47.3 (/bin/git)
-  - pytest: 8.3.5 (/opt/neocortex-v2-runner/.venv/bin/python3 -m pytest)
-  - ruff: 0.9.10 (/opt/neocortex-v2-runner/.venv/bin/python3 -m ruff)
+  - interpreter selection: /opt/neocortex-v2-runner/.venv/bin/python
+  - pytest: 8.3.5 (/opt/neocortex-v2-runner/.venv/bin/python -m pytest)
+  - ruff: 0.9.10 (/opt/neocortex-v2-runner/.venv/bin/python -m ruff)
   - import pytest: available
   - import ruff: available
+
+$ export PATH=/opt/neocortex-v2-runner/.venv/bin:$PATH
 $ pytest -q
 1 passed in 0.03s
-$ ruff check .
-All checks passed!
-```
-
-Этот запуск с `/opt/neocortex-v2-runner/.venv` завершился с кодом 0. Он
-свидетельствует только о состоянии этого отдельного venv, но не подтверждает
-offline readiness арбитра.
-
-## Повторная проверка фактического окружения арбитра
-
-В ходе повторного арбитражного прогона 2026-09-14 его shell выбрал
-`/opt/neocortex-runner/.venv/bin/python3`, а не путь из подтверждения
-владельца. В назначенном worktree выполнены ровно канонические команды:
-
-```console
-$ export PATH=/opt/neocortex-runner/.venv/bin:$PATH
-$ python3 scripts/check_environment.py
-MISSING:
-  - ruff: not runnable in /opt/neocortex-runner/.venv/bin/python3: '/opt/neocortex-runner/.venv/bin/python3: No module named ruff'
-  - import ruff: not installed in /opt/neocortex-runner/.venv/bin/python3
-INCOMPATIBLE:
-  - pytest: 9.1.1, need 8.3.5
-AVAILABLE:
-  - python: 3.13.5 (/opt/neocortex-runner/.venv/bin/python3)
-  - git: 2.47.3 (/bin/git)
-  - import pytest: available
-# exit 1
-$ pytest -q
-1 passed in 0.05s
 # exit 0
 $ ruff check .
-/usr/bin/bash: ruff: command not found
-# exit 127
+All checks passed!
+# exit 0
+$ python3 -m unittest discover -s tests_bootstrap -p 'test_*.py'
+Ran 6 tests ... OK
+# exit 0
 ```
 
-Следующий шаг требует нового ответа владельца через ASK: установить в
-`/opt/neocortex-runner/.venv` строго `pytest==8.3.5` и `ruff==0.9.10` из
-`requirements-dev.txt` с `constraints.txt`, затем подтвердить, что арбитр
-использует именно этот venv в `project test_cmd` (без секретов). До этого
-ответа и успешного повтора трёх команд задача не готова, а
-`python-offline-baseline` начинать нельзя. Воркер не менял host, venv или
-сервисы.
+Владелец отдельно подтвердил, что canonical project `test_cmd` арбитра
+выполнен из назначенного worktree с тем же PATH override и завершился с кодом
+0. Таким образом, service PATH арбитра не ошибочно принимается за project
+venv; `check_environment.py` закрывает различие для первой `$`-проверки, а
+`test_cmd` — для pytest/Ruff.
 
-## Известные prerequisites следующего этапа
+Ни пакеты, ни сервисы, ни credentials воркер не изменял.
+
+## Prerequisites следующего планирования
 
 Live-доступ к модели и native structured output не проверялись и не входят в
-этот gate. Остаются непроверенными кандидаты OpenCode `anomalyco/opencode`
-v1.18.30 и `opencode-ai==0.1.0a36`: владелец ещё не зафиксировал asset/checksum.
-Также не подготовлены отдельные data/config/history каталоги и loopback-only
-доступ OpenCode. Platform SDK lock и транзитивный hash lock отложены до выбора
-образа/ABI. Provider/model и остальные параметры целевого OpenCode пока
-неизвестны; их нельзя предполагать при следующем планировании.
+этот gate. Неизвестны параметры целевого OpenCode: окончательный release,
+asset/checksum для архитектуры, binary/container, data/config/history каталоги,
+loopback endpoint, provider/model, безопасная настройка credentials и
+совместимость `opencode-ai==0.1.0a36` с платформой. Отдельно понадобятся
+platform/transitive hash lock после выбора целевого image и ABI. Следующая
+задача обязана планировать эти проверки отдельно; readiness этого offline Python
+окружения их не предполагает.

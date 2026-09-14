@@ -43,9 +43,10 @@ Python 3.13.5, Git 2.47.3, pytest 8.3.5 и Ruff 0.9.10. Воспроизводи
 
 Владелец подготовил один стабильный checkout `/opt/neocortex-v2-runner` и его
 venv `/opt/neocortex-v2-runner/.venv`; `.venv-bootstrap` внутри worktree не
-используется. Воркеры и арбитр запускают команды из корня своего назначенного
-worktree, явно добавляя этот venv в `PATH`. Это не требует и не разрешает
-воркеру изменять `/opt/neocortex-v2-runner`.
+используется. Воркеры запускают команды из корня своего назначенного worktree,
+явно добавляя этот venv в `PATH`. Арбитр делает это только в `test_cmd`; его
+service `PATH` для `$`-критериев может принадлежать другому runner. Это не
+требует и не разрешает воркеру изменять `/opt/neocortex-v2-runner`.
 
 ```console
 $ export PATH=/opt/neocortex-v2-runner/.venv/bin:$PATH
@@ -55,10 +56,15 @@ $ ruff check .
 ```
 
 `test_cmd` проекта для арбитра содержит тот же override, поэтому его shell не
-обязан наследовать интерактивный `PATH` владельца:
+обязан наследовать интерактивный `PATH` владельца. Проверка `$ python3
+scripts/check_environment.py` независимо от ambient `PATH` сама переисполняет
+себя через `/opt/neocortex-v2-runner/.venv/bin/python`. Путь можно явно
+переопределить через `--python PATH`; если canonical venv отсутствует на другой
+машине, скрипт ясно сообщает fallback на вызвавший интерпретатор и проверяет его:
 
 ```console
 $ export PATH=/opt/neocortex-v2-runner/.venv/bin:$PATH; python -m pytest -q && ruff check .
+$ python3 scripts/check_environment.py --python /path/to/python
 ```
 
 На данном первом этапе stdlib bootstrap-проверки — временный контракт, который
@@ -74,8 +80,9 @@ check .`. В `tests/` есть базовый тест, поэтому pytest н
 tests ran`.
 
 `scripts/check_environment.py` использует только stdlib и только читает
-состояние: проверяет Python 3.13.x, Git >= 2.40, точные pytest/Ruff, а также
-импорты закреплённых модулей в том интерпретаторе, которым запущен скрипт. Он
+состояние: выбирает canonical Python (либо явно переданный `--python`), затем
+проверяет Python 3.13.x, Git >= 2.40, точные pytest/Ruff, а также импорты
+закреплённых модулей в выбранном интерпретаторе. Он
 раздельно печатает `MISSING`, `INCOMPATIBLE`, `AVAILABLE` и возвращает ненулевой
 код при обязательном пробеле. Он не печатает credentials, не вызывает модель и
 не проверяет живой сервис.
