@@ -44,9 +44,11 @@ class CheckEnvironmentTests(unittest.TestCase):
     @patch("scripts.check_environment.os.path.isfile", return_value=True)
     def test_existing_selected_python_reexecs(self, isfile, access):
         selected = "/tmp/project-python"
-        with patch("scripts.check_environment.os.execv", side_effect=SystemExit) as reexec:
-            with self.assertRaises(SystemExit):
-                main(["--python", selected])
+        with (
+            patch("scripts.check_environment.os.execv", side_effect=SystemExit) as reexec,
+            self.assertRaises(SystemExit),
+        ):
+            main(["--python", selected])
         reexec.assert_called_once_with(
             selected, [selected, os.path.abspath("scripts/check_environment.py"), "--python", selected]
         )
