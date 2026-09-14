@@ -1,5 +1,10 @@
 # Offline readiness среды
 
+> Статус: **waiting for owner**. Последняя проверка показала, что ранее
+> подтверждённое `/opt/neocortex-v2-runner/.venv` не является окружением,
+> которое сейчас выбирает арбитр (`/opt/neocortex-runner/.venv`). Поэтому
+> успешный результат ниже не является пройденным readiness gate.
+
 Дата проверки: 2026-09-14.
 
 ## Подтверждение владельца
@@ -24,8 +29,9 @@
 
 Владелец также подтвердил `nc doctor --project neocortex-v2` как `doctor:
 ready` и успешный readiness-прогон арбитра из одноразового worktree базовой
-ветки. Таким образом shell арбитра выбирает инструменты через `test_cmd`, а не
-через интерактивный `PATH` владельца.
+ветки. Это подтверждение относится к указанному владельцем пути
+`/opt/neocortex-v2-runner`; после повторной проверки оно требует уточнения для
+фактического пути арбитра.
 
 ## Повторная проверка воркера
 
@@ -56,8 +62,44 @@ $ ruff check .
 All checks passed!
 ```
 
-Все три канонические проверки завершились с кодом 0. Это подтверждает только
-offline readiness; сервисы не активировались и host не менялся воркером.
+Этот запуск с `/opt/neocortex-v2-runner/.venv` завершился с кодом 0. Он
+свидетельствует только о состоянии этого отдельного venv, но не подтверждает
+offline readiness арбитра.
+
+## Повторная проверка фактического окружения арбитра
+
+В ходе повторного арбитражного прогона 2026-09-14 его shell выбрал
+`/opt/neocortex-runner/.venv/bin/python3`, а не путь из подтверждения
+владельца. В назначенном worktree выполнены ровно канонические команды:
+
+```console
+$ export PATH=/opt/neocortex-runner/.venv/bin:$PATH
+$ python3 scripts/check_environment.py
+MISSING:
+  - ruff: not runnable in /opt/neocortex-runner/.venv/bin/python3: '/opt/neocortex-runner/.venv/bin/python3: No module named ruff'
+  - import ruff: not installed in /opt/neocortex-runner/.venv/bin/python3
+INCOMPATIBLE:
+  - pytest: 9.1.1, need 8.3.5
+AVAILABLE:
+  - python: 3.13.5 (/opt/neocortex-runner/.venv/bin/python3)
+  - git: 2.47.3 (/bin/git)
+  - import pytest: available
+# exit 1
+$ pytest -q
+1 passed in 0.05s
+# exit 0
+$ ruff check .
+/usr/bin/bash: ruff: command not found
+# exit 127
+```
+
+Следующий шаг требует нового ответа владельца через ASK: установить в
+`/opt/neocortex-runner/.venv` строго `pytest==8.3.5` и `ruff==0.9.10` из
+`requirements-dev.txt` с `constraints.txt`, затем подтвердить, что арбитр
+использует именно этот venv в `project test_cmd` (без секретов). До этого
+ответа и успешного повтора трёх команд задача не готова, а
+`python-offline-baseline` начинать нельзя. Воркер не менял host, venv или
+сервисы.
 
 ## Известные prerequisites следующего этапа
 
