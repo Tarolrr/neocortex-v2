@@ -3,11 +3,13 @@
 ## Decision and evidence boundary
 
 This is a bounded refinement of the T028/earlier planner proposal, not a new
-architecture study or implementation plan. The baseline remains an external
-OpenCode server and its TypeScript SDK (or documented server interface), with a
-small TypeScript coordinator. The current Python runner, its `outcome.json`
+architecture study or implementation plan. OpenCode remains an external server
+and execution/context/history owner, reached through its documented interface
+or SDK. **On approval of this proposal, the successor coordinator transitions
+to Python**; the former TypeScript-coordinator baseline is not the selected
+implementation language. The current Python runner, its `outcome.json`
 protocol, historical artifacts, deployed services, credentials and queued or
-blocked work are unchanged.
+blocked work are unchanged until a separately approved migration changes them.
 
 The coordinator adds governance; OpenCode remains the execution, context and
 history owner. Git remains the authority for commits and refs. Observations are
@@ -84,10 +86,12 @@ role/task/attempt/session/message identity in its prompt, validates schema **and
 semantics**, and persists a transition request. The agent supplies no authority.
 
 The docs show `body.format` in the structured-output example but
-`body.outputFormat` in the sessions API table. Exact invocation below is
-pseudocode, not a selected-runtime claim. A later compatibility smoke chooses
-the installed SDK generated type and verifies behaviour; version selection stays
-later work.
+`body.outputFormat` in the sessions API table. The TypeScript-oriented
+invocation below is design pseudocode only: it is **not** a contract for the
+Python API or its generated types. A later Python-SDK compatibility smoke
+chooses the installed release type and verifies behaviour; version selection
+stays later work. Failure to establish native structured output is a failed or
+blocked compatibility result, never permission to use text or file fallback.
 
 ```ts
 // Pseudocode: use the release type and its field name (format vs outputFormat).
