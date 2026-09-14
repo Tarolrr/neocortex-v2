@@ -52,6 +52,30 @@ def command_probe(command: str, expected: tuple[int, ...] | str) -> Probe:
     return Probe("available", f"{command}: {'.'.join(map(str, actual))} ({path})")
 
 
+def python_module_probe(module: str, expected: str) -> Probe:
+    """Check a tool through the interpreter selected to run this script.
+
+    Console-script lookup would inspect the caller's ambient PATH, which can
+    belong to a different virtual environment than ``sys.executable``.
+    """
+    command = [sys.executable, "-m", module, "--version"]
+    try:
+        completed = subprocess.run(
+            command, check=False, text=True, capture_output=True, timeout=5
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return Probe("missing", f"{module}: cannot run in {sys.executable} ({error})")
+    output = (completed.stdout + completed.stderr).strip()
+    actual = version_tuple(output)
+    if completed.returncode or actual is None:
+        return Probe("missing", f"{module}: not runnable in {sys.executable}: {output!r}")
+    wanted = version_tuple(expected)
+    assert wanted is not None
+    if actual != wanted:
+        return Probe("incompatible", f"{module}: {'.'.join(map(str, actual))}, need {expected}")
+    return Probe("available", f"{module}: {'.'.join(map(str, actual))} ({sys.executable} -m {module})")
+
+
 def python_probe() -> Probe:
     actual = sys.version_info[:2]
     if actual != PYTHON_VERSION:
@@ -70,7 +94,7 @@ def collect(probes: Mapping[str, Probe] | None = None) -> dict[str, Probe]:
         return dict(probes)
     result = {"python": python_probe(), "git": command_probe("git", GIT_MINIMUM)}
     for tool, version in TOOLS.items():
-        result[tool] = command_probe(tool, version)
+        result[tool] = python_module_probe(tool, version)
     for tool, module in IMPORTS.items():
         result[f"import:{module}"] = import_probe(module)
     return result
